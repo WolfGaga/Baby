@@ -124,7 +124,7 @@ def render_main_page():
         image_base64 = None
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded ultrasound image", use_container_width=True)
+            st.image(image, caption="Uploaded ultrasound image")
             
             # Convert to base64
             buffered = io.BytesIO()
