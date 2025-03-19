@@ -176,7 +176,7 @@ def render_main_page():
                         if "sd_optimized" in st.session_state["enhanced_images"]:
                             img_data = base64.b64decode(st.session_state["enhanced_images"]["sd_optimized"])
                             img = Image.open(io.BytesIO(img_data))
-                            st.image(img, caption="SD Optimized", use_container_width=True)
+                            st.image(img, caption="SD Optimized")
                             if st.button("Use SD Optimized", key="select_sd_optimized_main"):
                                 st.session_state["selected_enhancement"] = "sd_optimized"
                                 st.success("Selected: SD Optimized")
@@ -185,7 +185,7 @@ def render_main_page():
                         if "normalized" in st.session_state["enhanced_images"]:
                             img_data = base64.b64decode(st.session_state["enhanced_images"]["normalized"])
                             img = Image.open(io.BytesIO(img_data))
-                            st.image(img, caption="Normalized", use_container_width=True)
+                            st.image(img, caption="Normalized")
                             if st.button("Use Normalized", key="select_normalized_main"):
                                 st.session_state["selected_enhancement"] = "normalized"
                                 st.success("Selected: Normalized")
@@ -194,7 +194,7 @@ def render_main_page():
                         if "face_roi" in st.session_state["enhanced_images"]:
                             img_data = base64.b64decode(st.session_state["enhanced_images"]["face_roi"])
                             img = Image.open(io.BytesIO(img_data))
-                            st.image(img, caption="Face ROI", use_container_width=True)
+                            st.image(img, caption="Face ROI")
                             if st.button("Use Face ROI", key="select_face_roi_main"):
                                 st.session_state["selected_enhancement"] = "face_roi"
                                 st.success("Selected: Face ROI")
@@ -222,7 +222,7 @@ def render_main_page():
                                 img_data = base64.b64decode(st.session_state["enhanced_images"][opt])
                                 img = Image.open(io.BytesIO(img_data))
                                 display_name = option_names.get(opt, opt)
-                                st.image(img, caption=display_name, use_container_width=True)
+                                st.image(img, caption=display_name)
                                 if st.button(f"Use {display_name}", key=f"select_{opt}_tab2"):
                                     st.session_state["selected_enhancement"] = opt
                                     st.success(f"Selected: {display_name}")
@@ -259,7 +259,7 @@ def render_main_page():
         # Make generate button more prominent and simplify handling
         st.write("")
         st.write("Select a preprocessing version, then click the button below to generate the baby photo:")
-        generate_button = st.button("Generate Baby Photo", type="primary", use_container_width=True)
+        generate_button = st.button("Generate Baby Photo", type="primary")
     
     with col2:
         st.header("Output")
@@ -321,7 +321,7 @@ def render_main_page():
                 
                 # Show preview of edited image
                 st.write("Edit Preview:")
-                st.image(st.session_state.edit_image, caption="Edited Image", use_container_width=True)
+                st.image(st.session_state.edit_image, caption="Edited Image")
                 
                 # Apply changes button
                 if st.button("Use Edited Image", type="primary"):
@@ -334,16 +334,16 @@ def render_main_page():
             
             # Display image (using edited version if available and applied)
             display_image = st.session_state.generated_image
-            st.image(display_image, caption="Generated Baby Photo", use_container_width=True)
+            st.image(display_image, caption="Generated Baby Photo")
             
             # Only show comparison in stage 2
             if st.session_state.generation_stage == 1 and "outline_image" in st.session_state:
                 with st.expander("Compare with Outline", expanded=True):
                     cols = st.columns(2)
                     with cols[0]:
-                        st.image(st.session_state.outline_image, caption="Stage 1: Outline", use_container_width=True)
+                        st.image(st.session_state.outline_image, caption="Stage 1: Outline")
                     with cols[1]:
-                        st.image(st.session_state.generated_image, caption="Stage 2: Final Image", use_container_width=True)
+                        st.image(st.session_state.generated_image, caption="Stage 2: Final Image")
             
             # Display save path if available
             if "image_path" in st.session_state:
