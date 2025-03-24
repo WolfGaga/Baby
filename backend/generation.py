@@ -24,6 +24,7 @@ def process_generation(sidebar_inputs, main_inputs):
     """
     api_key = sidebar_inputs["api_key"]
     ethnicity = sidebar_inputs["ethnicity"]
+    skin_tone = sidebar_inputs.get("skin_tone")
     control_strength = sidebar_inputs.get("control_strength", 0.85)
     steps = sidebar_inputs.get("steps", 35)
     guidance_scale = sidebar_inputs.get("guidance_scale", 8.5)
@@ -41,12 +42,25 @@ def process_generation(sidebar_inputs, main_inputs):
     # Update ethnicity in session state
     update_ethnicity(ethnicity)
     
-    # Always use the latest ethnicity and update prompts when regenerating Stage 2
-    if st.session_state.generation_stage == 1 and st.session_state.get("is_regenerating", False):
+    # Always use the latest ethnicity and update prompts when regenerating
+    if st.session_state.generation_stage >= 1 and st.session_state.get("is_regenerating", False):
         # Update prompt with the current ethnicity if it's a default prompt
         ethnicity_prompt = ETHNICITY_PROMPTS[ethnicity]
-        positive_prompt = PROMPT_TEMPLATES["stage_1_positive"].format(ethnicity_prompt=ethnicity_prompt)
-        st.info(f"Updated prompt with {ethnicity} ethnicity features")
+        if st.session_state.generation_stage == 1:
+            positive_prompt = PROMPT_TEMPLATES["stage_1_positive"].format(ethnicity_prompt=ethnicity_prompt)
+            st.info(f"Updated prompt with {ethnicity} ethnicity features")
+        elif st.session_state.generation_stage == 2 and skin_tone:
+            previous_skin_tone = st.session_state.get("previous_skin_tone", "Medium")
+            positive_prompt = PROMPT_TEMPLATES["stage_2_positive"].format(skin_tone=skin_tone, ethnicity=ethnicity)
+            
+            # Show a message specific to skin tone change
+            if previous_skin_tone != skin_tone:
+                st.info(f"Adjusting skin tone from {previous_skin_tone} to {skin_tone}")
+            else:
+                st.info(f"Regenerating with {skin_tone} skin tone")
+            
+            # Save current skin tone for next comparison
+            st.session_state["previous_skin_tone"] = skin_tone
     
     # Validate inputs
     if not api_key:
@@ -125,7 +139,7 @@ def process_generation(sidebar_inputs, main_inputs):
             )
             progress_bar.empty()
             
-        else:
+        elif st.session_state.generation_stage == 1:
             status.info("Stage 2: Generating final image using structure control...")
             
             # Check for outline image
@@ -163,6 +177,45 @@ def process_generation(sidebar_inputs, main_inputs):
                 
             seed = None  # Control structure doesn't return a seed
         
+        elif st.session_state.generation_stage == 2:
+            status.info("Stage 3: Adjusting skin tone while preserving features...")
+            
+            # Check for final image
+            if "final_image_base64" not in st.session_state:
+                st.error("No final image found. Please generate a final image first.")
+                return
+            
+            # Get final image for structure control
+            final_image_base64 = st.session_state.final_image_base64
+            final_image_bytes = base64.b64decode(final_image_base64)
+            
+            # Display debug information
+            st.write(f"Adjusting skin tone to {skin_tone} while preserving features...")
+            
+            # Generate the skin tone adjusted image with progress indicator
+            progress_bar = st.progress(0)
+            for i in range(5):
+                progress_bar.progress((i+1) * 20)
+                if i < 4:  # Don't sleep on last iteration
+                    time.sleep(0.5)
+                    
+            # Always use control_strength of 1.0 for skin tone adjustment
+            generated_image, generated_image_base64 = generate_with_control_structure(
+                api_key,
+                final_image_bytes,
+                positive_prompt,
+                negative_prompt,
+                1.0  # Maximum control strength to preserve features
+            )
+            progress_bar.empty()
+            
+            # Check if generation was successful
+            if generated_image is None:
+                st.error(ERROR_MESSAGES["generation_failed"])
+                return
+                
+            seed = None  # Control structure doesn't return a seed
+        
         # Save results if image generated successfully
         if generated_image:
             status.success(SUCCESS_MESSAGES["stage_completed"].format(stage=st.session_state.generation_stage + 1))
@@ -173,7 +226,7 @@ def process_generation(sidebar_inputs, main_inputs):
             st.session_state.generation_completed = True
             
             # Debug output to verify stage and image
-            st.write(f"Generation successful for stage {st.session_state.generation_stage + 1}/2")
+            st.write(f"Generation successful for stage {st.session_state.generation_stage + 1}/3")
             
             # Save to history
             save_to_history(
@@ -185,7 +238,7 @@ def process_generation(sidebar_inputs, main_inputs):
             )
             
             # Save image to disk
-            stage_label = ["outline", "final"][st.session_state.generation_stage]
+            stage_label = ["outline", "final", "skin_adjusted"][st.session_state.generation_stage]
             output_dir = get_output_dir()
             os.makedirs(output_dir, exist_ok=True)
             
@@ -206,6 +259,11 @@ def process_generation(sidebar_inputs, main_inputs):
             if st.session_state.generation_stage == 0:
                 st.session_state.outline_image = generated_image
                 st.session_state.outline_image_base64 = generated_image_base64
+            
+            # If this is stage 1, save final image for potential later use in skin tone adjustment
+            if st.session_state.generation_stage == 1:
+                st.session_state.final_image = generated_image
+                st.session_state.final_image_base64 = generated_image_base64
             
             # Clear regeneration flags to prevent automatic stage advancement
             for flag in ["force_regenerate", "prevent_auto_progress", 
