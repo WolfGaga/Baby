@@ -9,7 +9,7 @@ from backend.image_editor import rotate_image, crop_image, image_to_base64
 from config import (
     ETHNICITY_OPTIONS, ETHNICITY_PROMPTS, PROMPT_TEMPLATES,
     UI_TEXT, ERROR_MESSAGES, SUCCESS_MESSAGES, DEFAULT_SETTINGS,
-    ENHANCEMENT_DISPLAY_NAMES
+    ENHANCEMENT_DISPLAY_NAMES, SKIN_TONE_OPTIONS
 )
 
 def render_instructions():
@@ -19,13 +19,13 @@ def render_instructions():
 
 def render_sidebar():
     """Render the sidebar UI elements and return the inputs"""
-    # 初始化变量，确保所有路径都有定义
     steps = DEFAULT_SETTINGS["steps"]
     guidance_scale = DEFAULT_SETTINGS["guidance_scale"]
     strength = DEFAULT_SETTINGS["strength"]
     control_strength = DEFAULT_SETTINGS["control_strength"]
     contrast = DEFAULT_SETTINGS["contrast"]
     brightness = DEFAULT_SETTINGS["brightness"]
+    skin_tone = None
     
     with st.sidebar:
         st.header("Settings")
@@ -43,6 +43,23 @@ def render_sidebar():
             index=0
         )
         
+        # Show skin tone selector only for stage 2
+        if st.session_state.generation_stage == 2:
+            # Get previous skin tone value to check for changes
+            previous_skin_tone = st.session_state.get("skin_tone", "Medium")
+            
+            skin_tone = st.selectbox(
+                "Adjust Skin Tone",
+                SKIN_TONE_OPTIONS,
+                index=SKIN_TONE_OPTIONS.index(previous_skin_tone) if previous_skin_tone in SKIN_TONE_OPTIONS else 2  # Default to Medium
+            )
+            
+            # Update session state immediately when skin tone changes
+            if skin_tone != previous_skin_tone:
+                st.session_state.skin_tone = skin_tone
+                # Force rerun to update prompt text areas with new skin tone
+                st.rerun()
+        
         st.subheader("Generation Settings")
         
         # Show current generation stage
@@ -51,11 +68,18 @@ def render_sidebar():
             steps = st.slider("Steps", min_value=20, max_value=50, value=DEFAULT_SETTINGS["steps"])
             guidance_scale = st.slider("CFG Scale", min_value=1.0, max_value=10.0, value=DEFAULT_SETTINGS["guidance_scale"], step=0.1)
             strength = st.slider("Strength", min_value=0.3, max_value=0.9, value=DEFAULT_SETTINGS["strength"], step=0.05)
-        else:
+        elif st.session_state.generation_stage == 1:
             st.info("Stage: Final image generation")
             control_strength = st.slider("Control Strength", min_value=0.1, max_value=1.0, value=DEFAULT_SETTINGS["control_strength"], step=0.05)
             st.info("Control strength determines how closely the final image will follow the structure of the outline.")
-            # 重置其他参数，不要重复声明control_strength
+            strength = 0
+            steps = 0
+            guidance_scale = 0
+        elif st.session_state.generation_stage == 2:
+            st.info("Stage: Skin tone adjustment")
+            # For skin tone adjustment, use maximum control strength to maintain features
+            control_strength = 1.0
+            st.info("Using maximum control strength to preserve baby features while adjusting skin tone.")
             strength = 0
             steps = 0
             guidance_scale = 0
@@ -64,7 +88,7 @@ def render_sidebar():
         with st.expander("Advanced settings"):
             manual_stage = st.radio(
                 "Manual stage selection", 
-                ["Auto-progress", "Initial outline", "Final image"],
+                ["Auto-progress", "Initial outline", "Final image", "Skin tone adjustment"],
                 horizontal=True
             )
             
@@ -72,6 +96,8 @@ def render_sidebar():
                 st.session_state.generation_stage = 0
             elif manual_stage == "Final image":
                 st.session_state.generation_stage = 1
+            elif manual_stage == "Skin tone adjustment":
+                st.session_state.generation_stage = 2
             
             # Reset button
             if st.button("Reset generation pipeline"):
@@ -84,6 +110,10 @@ def render_sidebar():
                     del st.session_state.outline_image
                 if "outline_image_base64" in st.session_state:
                     del st.session_state.outline_image_base64
+                if "final_image" in st.session_state:
+                    del st.session_state.final_image
+                if "final_image_base64" in st.session_state:
+                    del st.session_state.final_image_base64
                 if "image_path" in st.session_state:
                     del st.session_state.image_path
                 st.rerun()
@@ -103,6 +133,7 @@ def render_sidebar():
     return {
         "api_key": api_key,
         "ethnicity": ethnicity,
+        "skin_tone": skin_tone,
         "steps": steps,
         "guidance_scale": guidance_scale,
         "strength": strength,
@@ -243,8 +274,17 @@ def render_main_page():
         
         # Set stage-specific prompts with improved orientation guidance
         stage = st.session_state.generation_stage
-        default_positive = PROMPT_TEMPLATES["stage_0_positive"] if stage == 0 else PROMPT_TEMPLATES["stage_1_positive"].format(ethnicity_prompt=ethnicity_prompt)
-        default_negative = PROMPT_TEMPLATES["stage_0_negative"] if stage == 0 else PROMPT_TEMPLATES["stage_1_negative"]
+        if stage == 0:
+            default_positive = PROMPT_TEMPLATES["stage_0_positive"]
+            default_negative = PROMPT_TEMPLATES["stage_0_negative"]
+        elif stage == 1:
+            default_positive = PROMPT_TEMPLATES["stage_1_positive"].format(ethnicity_prompt=ethnicity_prompt)
+            default_negative = PROMPT_TEMPLATES["stage_1_negative"]
+        elif stage == 2:
+            # Always get the most current skin tone from session state
+            skin_tone = st.session_state.get("skin_tone", "Medium")
+            default_positive = PROMPT_TEMPLATES["stage_2_positive"].format(skin_tone=skin_tone, ethnicity=ethnicity)
+            default_negative = PROMPT_TEMPLATES["stage_2_negative"]
         
         positive_prompt = st.text_area(
             "Positive prompt", 
@@ -265,8 +305,8 @@ def render_main_page():
         st.header("Output")
         if "generated_image" in st.session_state:
             # Display current stage
-            stage_names = ["Initial Outline", "Final Image"]
-            st.caption(f"Stage {st.session_state.generation_stage+1}/2: {stage_names[st.session_state.generation_stage]}")
+            stage_names = ["Initial Outline", "Final Image", "Skin Tone Adjusted"]
+            st.caption(f"Stage {st.session_state.generation_stage+1}/3: {stage_names[st.session_state.generation_stage]}")
             
             # Add image editing tools
             with st.expander("Image Editor", expanded=False):
@@ -336,7 +376,7 @@ def render_main_page():
             display_image = st.session_state.generated_image
             st.image(display_image, caption="Generated Baby Photo")
             
-            # Only show comparison in stage 2
+            # Only show comparison in stage 2 or 3
             if st.session_state.generation_stage == 1 and "outline_image" in st.session_state:
                 with st.expander("Compare with Outline", expanded=True):
                     cols = st.columns(2)
@@ -344,6 +384,13 @@ def render_main_page():
                         st.image(st.session_state.outline_image, caption="Stage 1: Outline")
                     with cols[1]:
                         st.image(st.session_state.generated_image, caption="Stage 2: Final Image")
+            elif st.session_state.generation_stage == 2 and "final_image" in st.session_state:
+                with st.expander("Compare with Previous Stage", expanded=True):
+                    cols = st.columns(2)
+                    with cols[0]:
+                        st.image(st.session_state.final_image, caption="Stage 2: Final Image")
+                    with cols[1]:
+                        st.image(st.session_state.generated_image, caption="Stage 3: Skin Tone Adjusted")
             
             # Display save path if available
             if "image_path" in st.session_state:
@@ -413,6 +460,9 @@ def render_main_page():
                 elif st.session_state.generation_stage == 1:
                     # For Stage 2, show that ethnicity will be updated
                     st.info("Regeneration will use the latest ethnicity selection from the sidebar")
+                elif st.session_state.generation_stage == 2:
+                    # For skin tone adjustment stage
+                    st.info("Regeneration will use the currently selected skin tone from the sidebar")
                 
                 regenerate_clicked = st.button(
                     "Regenerate This Stage", 
@@ -446,10 +496,11 @@ def render_main_page():
                     st.rerun()
             
             with col_action2:
-                # Continue button - Only show if we're at stage 1
-                if st.session_state.generation_stage == 0:
+                # Continue button - Only show if we're at stage 1 or 2
+                if st.session_state.generation_stage < 2:
+                    next_stage_name = "Final Image" if st.session_state.generation_stage == 0 else "Skin Tone Adjustment"
                     continue_clicked = st.button(
-                        "Continue to Final Image", 
+                        f"Continue to {next_stage_name}", 
                         type="primary", 
                         key=f"continue_button_{st.session_state.generation_stage}"
                     )
@@ -460,21 +511,26 @@ def render_main_page():
                             if flag in st.session_state:
                                 del st.session_state[flag]
                                 
-                        # Save the outline image for later use in structure control
+                        # Save the current stage image for later use
                         if "generated_image" in st.session_state:
-                            st.session_state.outline_image = st.session_state.generated_image
-                        if "generated_image_base64" in st.session_state:
-                            st.session_state.outline_image_base64 = st.session_state.generated_image_base64
+                            if st.session_state.generation_stage == 0:
+                                st.session_state.outline_image = st.session_state.generated_image
+                                if "generated_image_base64" in st.session_state:
+                                    st.session_state.outline_image_base64 = st.session_state.generated_image_base64
+                            elif st.session_state.generation_stage == 1:
+                                st.session_state.final_image = st.session_state.generated_image
+                                if "generated_image_base64" in st.session_state:
+                                    st.session_state.final_image_base64 = st.session_state.generated_image_base64
                         
                         # EXPLICIT STAGE ADVANCEMENT: Only advance when user clicks continue
-                        st.session_state.generation_stage = 1
+                        st.session_state.generation_stage += 1
                         
                         # Set proper flags for stage advancement
                         st.session_state["force_regenerate"] = True
                         st.session_state["advancing_to_next_stage"] = True
                         st.rerun()
                 else:
-                    st.success("Final image completed! You can download the image or save it to disk.")
+                    st.success("All stages completed! You can download the image or save it to disk.")
             
             # Add a Generate New Baby button with prominent styling
             st.write("---")
