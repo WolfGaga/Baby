@@ -62,12 +62,19 @@ ETHNICITY_PROMPTS = {
     "Mixed": ""
 }
 
+# Skin tone adjustment options
+SKIN_TONE_OPTIONS = [
+    "Fair", "Light", "Medium", "Olive", "Tan", "Brown", "Dark"
+]
+
 # Prompt templates
 PROMPT_TEMPLATES = {
     "stage_0_positive": "Photo of a sleeping newborn baby head based on the image. Head only, no body, matching the exact facial orientation as input image. Detailed face structure with prominent facial features.",
     "stage_1_positive": "Portrait of a sleeping beautiful newborn baby with {ethnicity_prompt}NO HAT, natural hair, clearly visible hairline, wrapped in soft blanket, swaddled tightly with only face visible, white background. matching the exact facial orientation as input image.",
+    "stage_2_positive": "(exact copy of this specific baby:1.8), (only change skin color to {skin_tone}:1.5), (preserve all original features:1.7), (preserve {ethnicity} facial features:1.7), (preserve exact same closed eyes:1.8), (preserve identical nose shape:1.7), (preserve exact same mouth:1.7), (preserve exact same hair color and style:1.7), (pure white blanket:1.8), (pure white background:1.8), (bright white surroundings:1.8), (snow white bedding:1.8), (preserve identical lighting:1.6), (preserve identical pose:1.7), (photorealistic:1.2)",
     "stage_0_negative": "Open eyes, Ugly, Weird Mouth, Crooked Mouth, twisted limbs, bad skin, wrinkles, uneven face, open mouth, lowers, bad anatomy, bad hands, missing fingers, extra digits, cropped, worst quality, low quality, mutant",
-    "stage_1_negative": "different facial orientation, hat, cap, beanie, head covering, head wrap, headwear, Multiple eyebrows, Asymmetrical eyes, Open eyes, visible limbs, hands, arms, fingers, feet, legs, exposed body parts, ugly, weird mouth, cropped, bad anatomy, deformities, blurry, low quality, unrealistic skin texture, uneven face"
+    "stage_1_negative": "different facial orientation, hat, cap, beanie, head covering, head wrap, headwear, Multiple eyebrows, Asymmetrical eyes, Open eyes, visible limbs, hands, arms, fingers, feet, legs, exposed body parts, ugly, weird mouth, cropped, bad anatomy, deformities, blurry, low quality, unrealistic skin texture, uneven face",
+    "stage_2_negative": "tinted background, colored background, off-white background, cream background, beige background, changed ethnicity, altered facial features, different lighting, open eyes, changed hair, unrealistic"
 }
 
 # UI text
