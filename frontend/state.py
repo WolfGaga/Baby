@@ -11,6 +11,10 @@ def initialize_state():
     if "ethnicity" not in st.session_state:
         st.session_state.ethnicity = "Asian"
     
+    # Initialize skin tone for stage 3
+    if "skin_tone" not in st.session_state:
+        st.session_state.skin_tone = "Medium"
+    
     # Initialize generation history
     if "generation_history" not in st.session_state:
         st.session_state.generation_history = []
